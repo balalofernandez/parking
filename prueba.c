@@ -17,6 +17,12 @@ int main(){
     int b;
     valor(&a[0]);
     printf("%i\n",a[0]);*/
-    sleep(3);
-    printf(".");
+    int **prueba;
+    prueba = (int **) calloc(2,sizeof(int *));
+
+    for(int i = 0; i < 2; i++)
+        prueba[i] = (int *)calloc(3,sizeof(int));
+
+    prueba[1][2] = 10;
+    printf("%i\n",prueba[0][2]);
 }
