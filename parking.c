@@ -81,31 +81,28 @@ int main(int argc, char* argv[]){
         return(1);
         break;
     }
-    printf("coches %i\n",coches);
     plazasLibres = plazas*plantas;//Inicializamos las plazas libres en función de las plazas y plantas del parking
     //Reservamos espacio para el parking [planta][plaza]
     parking = (int **) calloc(plantas,sizeof(int *));
-    printf("coches %i\n",coches);
     for(i = 0; i < plantas; i++)
         parking[i] = (int *) calloc(plazas,sizeof(int));
     //Iniciamos el mutex y las condiciones
     pthread_mutex_init(&mutex, NULL); 
     pthread_cond_init(&no_lleno, NULL);
-    pthread_cond_init(&huecoCamion, NULL);
-    printf("hola\n");
-    
+    pthread_cond_init(&huecoCamion, NULL);    
     //creamos tantos threads como coches tenemos
-    printf("coches %i\n",coches);
+    fprintf(stderr,"coches %i\n",coches);
+    fprintf(stderr,"camion %i\n",camiones);
     nCoches = (int *) calloc(coches, sizeof(int));
     for (i=0;i<coches;i++){
         nCoches[i] = (i+1);
         pthread_create(&tid,NULL,coche,(void *) &nCoches[i]);
     }
     //Creamos tantos threads como camiones tenemos
-    nCamiones = (int *) calloc(coches, sizeof(int));
+    nCamiones = (int *) calloc(camiones, sizeof(int));
     for (i=0;i<camiones;i++){
         nCamiones[i] = (i+1);
-        pthread_create(&tid,NULL,coche,(void *) &nCamiones[i]);
+        pthread_create(&tid,NULL,camion,(void *) &nCamiones[i]);
     }
     while(1);
     return(1);
@@ -206,28 +203,37 @@ void *camion(void *nCamion){
         {
             pthread_cond_wait(&huecoCamion, &mutex);
         }
+        fprintf(stderr,"Soy el camion %i\n", numCamion);        
         //Seccion crítica
         plazasLibres -= 2;
         aparcarCamion(plantaLibreAux,plazaLibreAux, numCamion);//la esta función busca un aparcamiento y devuelve la posición
+        muestraParking();
         pthread_mutex_unlock(&mutex);//Liberamos el mutex para que otros puedan acceder al parking
         espera = (rand()% 8) +1;
         sleep(espera);//Esperamos un tiempo aleatorio
         pthread_mutex_lock(&mutex);//peleamos por el mutex para desaparcar
+        fprintf(stderr,"Sale el camion %i\n", numCamion);        
         plazasLibres +=2;
         desaparcarCamion(plantaLibreAux, plazaLibreAux);
         pthread_cond_signal(&no_lleno);
         pthread_cond_signal(&huecoCamion);
+        muestraParking();
         pthread_mutex_unlock(&mutex);
     }
 };
 
 void aparcarCamion(int plantaAux, int plazaAux, int numCamion){
-    //DOBLE CHECK
+    if(parking[plantaAux][plazaAux] || parking[plantaAux][plazaAux+1]){
+        fprintf(stderr,"Err. Se está aparcando en una plaza que no se puede");
+    }
+    parking[plantaAux][plazaAux]=numCamion;
+    parking[plantaAux][plazaAux+1]=numCamion;
 }
 
 
 void desaparcarCamion(int plantaAux, int plazaAux){
-
+    parking[plantaAux][plazaAux]=0;
+    parking[plantaAux][plazaAux+1]=0;
 }
 
 void muestraParking(){
