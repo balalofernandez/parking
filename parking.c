@@ -109,9 +109,6 @@ void *coche(void* nCoche){
         //Seccion crítica
         plazasLibres--;
         aparcar(&plantaAux,&plazaAux, numCoche);//esta función busca un aparcamiento y devuelve la posición
-        if (plazasLibres !=0){
-            pthread_condition_signal(&no_lleno);
-        }
         pthread_mutex_unlock(&mutex);
         //el vehiculo ha sido estacionado
         espera = (rand()% 8) +1;
@@ -148,7 +145,7 @@ void aparcar(int *plantaAux, int *plazaAux, int numCoche){
     *plantaAux=--i;
 }
 void desaparcar(int planta,int plaza){
-
+    parking[planta][plaza]=0;
 }
 
 
