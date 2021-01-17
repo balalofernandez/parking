@@ -157,7 +157,7 @@ void *camion(void *nCamion){
     pthread_mutex_unlock(&mutex);//Liberamos el mutex para que otros puedan acceder al parking
     espera = (rand()% 8) +1;
     sleep(espera);//Esperamos un tiempo aleatorio
-    pthread_mutex_lock(&mutex);//peleamos por el mutex 
+    pthread_mutex_lock(&mutex);//peleamos por el mutex para desaparcar
     plazasLibres +=2;
     desaparcarCamion(plantaLibreAux, plazaLibreAux);
     pthread_cond_signal(&no_lleno);
