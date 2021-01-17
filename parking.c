@@ -101,18 +101,38 @@ int main(int argc, char* argv[]){
     }
 }
 
-void *coche(){
-    //Hacemos algo para que espere a entrar
-    int espera = (rand()% 8) +1;
-    sleep(espera);
-    pthread_mutex_lock(&mutex);
-    while (plazasLibres != 0)
-    {
-        pthread_cond_wait(&no_lleno, &mutex);
+void *coche(void* nCoche){
+    while (1){
+        int plantaAux,plazaAux;
+        int numCoche = *(int *) nCoche;
+        //Hacemos algo para que espere a entrar
+        int espera = (rand()% 8) +1;
+        sleep(espera);
+        pthread_mutex_lock(&mutex);
+        while (plazasLibres != 0)
+        {
+            pthread_cond_wait(&no_lleno, &mutex);
+        }
+        //Seccion crítica
+        plazasLibres--;
+        aparcar(&plantaAux,&plazaAux, numCoche);//esta función busca un aparcamiento y devuelve la posición
+        if (plazasLibres !=0){
+            pthread_condition_signal(&no_lleno);
+        }
+        pthread_mutex_unlock(&mutex);
+        //el vehiculo ha sido estacionado
+        espera = (rand()% 8) +1;
+        sleep(espera);
+        pthread_mutex_lock(&mutex);
+        plazasLibres++;
+        desaparcar(plantaAux,plazaAux);
+        //comprobamos que haya hueco en una plaza adyacente, teniendo cuidado con las plazas de los extremos
+        if (((plazaAux < plazas-1) && (parking[plantaAux][plazaAux+1]==0)) || ((plazaAux>0) && (parking[plantaAux][plazaAux-1]==0))){
+            pthread_cond_signal(&huecoCamion);
+        }
+        pthread_condition_signal(&no_lleno);
+        pthread_mutex_unlock(&mutex);
     }
-    //Seccion crítica
-    plazasLibres--;
-    aparcar();//la esta función busca un aparcamiento y devuelve la posición
     
 };
 
