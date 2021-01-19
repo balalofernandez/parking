@@ -145,7 +145,7 @@ int main(int argc, char* argv[]){
     //Creamos tantos threads como camiones tenemos
     nCamiones = (int *) calloc(camiones, sizeof(int));
     for (i=0;i<camiones;i++){
-        nCamiones[i] = (i+1);
+        nCamiones[i] = (101+i);
         pthread_cond_init(&esperandoCamion[i], NULL);
         pthread_create(&tid,NULL,camion,(void *) &nCamiones[i]);
     }
@@ -165,24 +165,20 @@ void *coche(void* nCoche){
 
     while (1){
         //Hacemos algo para que espere a entrar
-        espera = (rand()% 25) +1;
+        espera = (rand()% 40) +1;
         sleep(espera);
         pthread_mutex_lock(&mutex);//Tenemos el mutex bloqueado
         //Añadimos un coche a la cola total
         insertarTotal(&esteCoche);
         vehiculosCola++;
         primero = *primeroTotal();
-        if(vehiculosCola == 1 && vehiculosColaCamiones == 0){//Puede darse la casualidad de que el parking esté lleno y llegue justo un coche, nadie le avisa
+        if(vehiculosCola == 1){//Puede darse la casualidad de que el parking esté lleno y llegue justo un coche, nadie le avisa
             while (!plazasLibres){
                 pthread_cond_wait(&no_lleno, &mutex); //con esto va a esperar a que le avisen de que ya es el primero
             }
         }  
         else{
-            fprintf(stderr,"El primero es %i\n", primero.numero);
-            while ((!plazasLibres)){//espera mientras no sea el primero
-                while (contadorCoches > 2 && vehiculosColaCamiones){
-                    pthread_cond_wait(&turnoCamion, &mutex);
-                }
+            while ((!plazasLibres) || !(primero.numero == esteCoche.numero && !primero.esCamion)){//espera mientras no sea el primero
                 pthread_cond_wait(&esperandoCoche[numCoche-1], &mutex); //con esto va a esperar a que le avisen de que ya es el primero
                 primero = *(TVehiculo *) primeroTotal();//En caso que se ejecute esta línea actualizo el primero, porque tengo el mutex
             }
@@ -190,10 +186,8 @@ void *coche(void* nCoche){
         //Seccion crítica
         //Lo quitamos de la cola porque volvemos a tener el control del mutex
         extraerTotal();
-        vehiculosCola--;
-        fprintf(stderr,"\n Han entrado %i coches\n\n", contadorCoches);        
-        contadorCoches++;//Ha entrado un coche        
-        fprintf(stderr,"Soy el coche %i\n", numCoche);
+        vehiculosCola--;            
+        fprintf(stderr,"Soy el coche %i\n", numCoche);  
         if(vehiculosCola){
             primero = *(TVehiculo *) primeroTotal();        
             fprintf(stderr,"Y el siguiente es %i\n", primero.numero);
@@ -210,31 +204,21 @@ void *coche(void* nCoche){
         plazasLibres++;
         desaparcar(plantaAux,plazaAux);
         muestraParking();
+        fprintf(stderr,"Vehiculos %i\n\n", vehiculosCola);
         //Comprobamos que haya hueco en una plaza adyacente, teniendo cuidado con las plazas de los extremos
         
         pthread_cond_signal(&no_lleno);
-        fprintf(stderr,"\n vehiculos %i\n\n", vehiculosCola);
-        fprintf(stderr,"\n camiones %i\n\n", vehiculosColaCamiones);
         if(vehiculosCola){
             primero = *(TVehiculo *) primeroTotal();
             if(primero.esCamion){
                 pthread_cond_signal(&esperandoCamion[(primero.numero)-1]);
             }
             else{
-                if((contadorCoches % 3 != 0) && vehiculosColaCamiones){
-                    pthread_cond_signal(&esperandoCoche[(primero.numero)-1]);
-                }
-                else if(!vehiculosColaCamiones)
-                    fprintf(stderr,"primero %i\n\n", primero.numero);
-                    pthread_cond_signal(&esperandoCoche[(primero.numero)-1]);
+                pthread_cond_signal(&esperandoCoche[(primero.numero)-1]);
             }
         }
         if (((plazaAux < plazas-1) && (parking[plantaAux][plazaAux+1]==0)) || ((plazaAux>0) && (parking[plantaAux][plazaAux-1]==0))){
             pthread_cond_signal(&huecoCamion);
-            if(contadorCoches % 3 == 0){
-                contadorCoches = 0;
-                pthread_cond_signal(&turnoCamion);
-            }
         }        
         pthread_mutex_unlock(&mutex);
     }
@@ -309,32 +293,28 @@ void *camion(void *nCamion){
         puesto que no va a entrar en el primer while
         luego se pasará a la cola de camiones y le daremos el turno al camión
         */
-        while ((primero.numero != esteCamion.numero || !primero.esCamion) && !buscaLibre(&plantaLibreAux, &plazaLibreAux)){
-            pthread_cond_wait(&esperandoCamion[numCamion-1], &mutex); //con esto va a esperar a que le avisen de que ya es el primero
-        }    
-        if(primero.numero == esteCamion.numero || primero.esCamion){
-            extraerTotal();
-            vehiculosCola--;
-            insertarCamion(&esteCamion);
-            vehiculosColaCamiones++;
-            primero = *(TVehiculo *) primeroCamiones();
-        }
-        //A partir de aqui vamos a esperar a que entre el camión
-        if(!vehiculosCola){//si no hay más en la cola, le damos el turno al camión
-            while (primero.numero != esteCamion.numero || !primero.esCamion || !buscaLibre(&plantaLibreAux, &plazaLibreAux)){
-                pthread_cond_wait(&huecoCamion, &mutex);
+        //
+        //TT
+        if(vehiculosCola == 1){//Puede darse la casualidad de que el parking esté lleno y llegue justo un coche, nadie le avisa
+            while (!buscaLibre(&plantaLibreAux, &plazaLibreAux) ){
+                pthread_cond_wait(&huecoCamion, &mutex); //con esto va a esperar a que le avisen de que ya es el primero
             }
-        }
-        else{//hay coches en la cola, entonces esperamos a que le toque al camión
-            while (primero.numero != esteCamion.numero || !primero.esCamion || !buscaLibre(&plantaLibreAux, &plazaLibreAux)){
-                pthread_cond_wait(&turnoCamion, &mutex); //con esto va a esperar a que le avisen de que le toca a un camión
+        }  
+        else{
+            while (!buscaLibre(&plantaLibreAux, &plazaLibreAux) || !(primero.numero == esteCamion.numero && !primero.esCamion)){//espera mientras no sea el primero
+                pthread_cond_wait(&esperandoCamion[numCamion-1], &mutex); //con esto va a esperar a que le avisen de que ya es el primero
+                primero = *(TVehiculo *) primeroTotal();//En caso que se ejecute esta línea actualizo el primero, porque tengo el mutex
             }
-        }            
-        extraerCamion();
-        vehiculosColaCamiones--; 
+        }     
+        extraerTotal();
+        vehiculosCola--; 
         contadorCoches = 0;
         //Seccion crítica
         fprintf(stderr,"Soy el camion %i\n", numCamion);  
+        if(vehiculosCola){
+            primero = *(TVehiculo *) primeroTotal();        
+            fprintf(stderr,"Y el siguiente es %i\n", primero.numero);
+        }  
         plazasLibres -= 2;
         aparcarCamion(plantaLibreAux,plazaLibreAux, numCamion);//la esta función busca un aparcamiento y devuelve la posición
         muestraParking();
@@ -357,8 +337,7 @@ void *camion(void *nCamion){
             }
         }
         muestraParking();
-        fprintf(stderr,"\n vehiculos %i\n\n", vehiculosCola);
-        fprintf(stderr,"\n camiones %i\n\n", vehiculosColaCamiones);
+        fprintf(stderr,"Vehiculos %i\n\n", vehiculosCola);
         pthread_mutex_unlock(&mutex);
     }
 };
