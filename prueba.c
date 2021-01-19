@@ -2,11 +2,38 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-//funcion por valor
-void valor(int **valor){
-    printf("bueno\n");
-    printf("%i\n", **valor);
-    // *valor = 4;
+typedef struct vehiculo{
+    int numero;
+    int camion;//booleano que verifica si es camión o no
+} TVehiculo;
+typedef struct cola{
+    TVehiculo *vehiculo;
+    struct cola *sig;
+}TCola;
+
+TCola *cabezaTotal=NULL, *finTotal=NULL;
+TCola *cabezaCamiones=NULL, *finCamiones=NULL;
+TCola *aux;
+
+void insertarTotal(TVehiculo *vehiculo){
+    aux=(TCola *)malloc(sizeof(TCola));
+    aux->vehiculo = vehiculo;
+    aux->sig = NULL;
+    if (finTotal==NULL)
+        finTotal=cabezaTotal=aux;
+    else
+    {
+        finTotal->sig = aux;
+        finTotal = aux;
+    }
+}
+
+void extraerTotal(){
+    if(cabezaTotal){
+        aux = cabezaTotal;
+        cabezaTotal = cabezaTotal->sig;
+        free(aux);
+    }
 }
 
 int main(){
@@ -17,12 +44,26 @@ int main(){
     int b;
     valor(&a[0]);
     printf("%i\n",a[0]);*/
-    int **prueba;
-    prueba = (int **) calloc(2,sizeof(int *));
+    TVehiculo *prueba;
+    prueba = (TVehiculo *) malloc(sizeof(TVehiculo));
+    TVehiculo vehiculo1;
+    vehiculo1.numero = 1;
+    vehiculo1.camion = 1;
+    TVehiculo vehiculo2;
+    vehiculo2.numero = 2;
+    vehiculo2.camion = 2;
+    TVehiculo vehiculo3;
+    vehiculo3.numero = 3;
+    vehiculo3.camion = 3;
+    TVehiculo *aux;
+    vehiculo2.numero = 0;
+    vehiculo2.camion = 0;
 
-    for(int i = 0; i < 2; i++)
-        prueba[i] = (int *)calloc(3,sizeof(int));
-
-    prueba[1][2] = 10;
-    printf("%i\n",prueba[0][2]);
+    insertarTotal(&vehiculo1);
+    insertarTotal(&vehiculo2);
+    insertarTotal(&vehiculo3);
+    printf("%i\n",cabezaTotal->sig->sig->vehiculo->numero);
+    extraerTotal();
+    extraerTotal();
+    printf("%i\n",cabezaTotal->vehiculo->numero);
 }
