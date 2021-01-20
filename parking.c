@@ -193,16 +193,9 @@ void *coche(void* nCoche){
         insertarTotal(&esteCoche);
         vehiculosCola++;
         primero = *primeroTotal();//Tomamos el primero de la cola
-        if(vehiculosCola == 1){//Puede darse la casualidad de que el parking esté lleno y llegue justo un coche, nadie le avisa
-            while (!plazasLibres){
-                pthread_cond_wait(&no_lleno, &mutex); //con esto va a esperar a que le avisen de que ya es el primero
-            }
-        }  
-        else{
-            while ((!plazasLibres) || !(primero.numero == esteCoche.numero && !primero.esCamion)){//espera mientras no sea el primero
-                pthread_cond_wait(&esperandoCoche[numCoche-1], &mutex); //con esto va a esperar a que le avisen de que ya es el primero
-                primero = *(TVehiculo *) primeroTotal();//En caso que se ejecute esta línea actualizo el primero, porque tengo el mutex
-            }
+        while ((!plazasLibres) || !(primero.numero == esteCoche.numero && !primero.esCamion)){//espera mientras no sea el primero
+            pthread_cond_wait(&esperandoCoche[numCoche-1], &mutex); //con esto va a esperar a que le avisen de que ya es el primero
+            primero = *(TVehiculo *) primeroTotal();//En caso que se ejecute esta línea actualizo el primero, porque tengo el mutex
         }
         //Seccion crítica        
         extraerTotal();//Lo quitamos de la cola
