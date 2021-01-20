@@ -3,10 +3,12 @@
 #include <stdio.h>
 #include <unistd.h>
 
+//Creamos un tipo vehículo
 typedef struct vehiculo{
     int numero;
     int esCamion;//booleano que verifica si es camión o no
 } TVehiculo;
+//Creamos una cola para meter los vehículos
 typedef struct cola{
     TVehiculo *vehiculo;
     struct cola *sig;
@@ -21,19 +23,15 @@ int coches;
 int camiones;
 
 TCola *cabezaTotal=NULL, *finTotal=NULL;
-TCola *cabezaCamiones=NULL, *finCamiones=NULL;
 TCola *aux;
 
 int vehiculosCola;//Los vehiculos que están en la cola total
-int vehiculosColaCamiones;//Los vehiculos que están en la cola de camiones
-int contadorCoches;//Indica el numero de coches que han entrado desde el último camión;
 
 pthread_mutex_t mutex;
 
 //Tenemos la condición de que el parking está lleno
 pthread_cond_t no_lleno;
 pthread_cond_t huecoCamion;
-pthread_cond_t turnoCamion;
 //Vamos a darle una condición de espera para autorizarle a pasar en el caso de que sea el primero de la cola
 pthread_cond_t *esperandoCoche;
 pthread_cond_t *esperandoCamion;
@@ -48,26 +46,15 @@ int buscaLibre(int *plantaLibre, int *plazaLibre); //funcion que busca la plaza 
 void muestraParking();
 void insertarTotal(TVehiculo *vehiculo);
 void extraerTotal();
-void insertarCamion(TVehiculo *vehiculo);
-void extraerCamion();
 TVehiculo *primeroTotal();
-TVehiculo *primeroCamiones();
 
 int main(int argc, char* argv[]){
     int i;
-    int *nCoches;
-    int *nCamiones;
+    int *nCoches;//Guarda el numero de cada coche
+    int *nCamiones;//Guarda el numero de cada camion
     pthread_t tid;
 
-    //Inicializamos las colas de camion y total
-    // colaTotal = (TVehiculo *) malloc(sizeof(TVehiculo));
-    // colaCamiones = (int *) malloc(sizeof(int));
-
     vehiculosCola = 0;
-    vehiculosColaCamiones = 0;
-    contadorCoches = 0;
-
-    printf("Se han introducido %i argumentos\n", argc);
     switch (argc)
     {
     case 1:
@@ -75,8 +62,11 @@ int main(int argc, char* argv[]){
         return 0;
         break;
     case 2:
-        printf("No se han introducido las plantas del parking, se inicializarán a 1\n");
         sscanf(argv[1], "%i", &plazas);
+        if(plazas < 2){
+            fprintf(stderr,"Error. No se ha introducido el numero de plazas correctamente\n");
+            return(1);
+        }
         printf("Numero de plazas %i\n", plazas);
         plantas = 1;
         printf("Numero de plantas %i\n", plantas);
@@ -89,6 +79,14 @@ int main(int argc, char* argv[]){
         sscanf(argv[1], "%i", &plazas);
         // plantas = (int) argv[2];
         sscanf(argv[2], "%i", &plantas);
+        if(plazas < 2){
+            fprintf(stderr,"Error. No se ha introducido el numero de plazas correctamente\n");
+            return(1);
+        }
+        if(plantas < 1){
+            fprintf(stderr,"Error. No se ha introducido el numero de plantas correctamente\n");
+            return(1);
+        }
         coches = 2*plazas*plantas;
         camiones = 0;
         break;
@@ -99,6 +97,18 @@ int main(int argc, char* argv[]){
         sscanf(argv[2], "%i", &plantas);
         // coches = (int) argv[3];
         sscanf(argv[3], "%i", &coches);
+        if(plazas < 2){
+            fprintf(stderr,"Error. No se ha introducido el numero de plazas correctamente\n");
+            return(1);
+        }
+        if(plantas < 1){
+            fprintf(stderr,"Error. No se ha introducido el numero de plantas correctamente\n");
+            return(1);
+        }
+        if(coches < 1){
+            fprintf(stderr,"Error. No se ha introducido el numero de coches correctamente\n");
+            return(1);
+        }
         camiones = 0;
         break;
     case 5:
@@ -110,10 +120,25 @@ int main(int argc, char* argv[]){
         sscanf(argv[3], "%i", &coches);
         // coches = (int) argv[4];
         sscanf(argv[4], "%i", &camiones);
-
+        if(plazas < 2){
+            fprintf(stderr,"Error. No se ha introducido el numero de plazas correctamente\n");
+            return(1);
+        }
+        if(plantas < 1){
+            fprintf(stderr,"Error. No se ha introducido el numero de plantas correctamente\n");
+            return(1);
+        }
+        if(coches < 1){
+            fprintf(stderr,"Error. No se ha introducido el numero de coches correctamente\n");
+            return(1);
+        }
+        if(camiones < 1){
+            fprintf(stderr,"Error. No se ha introducido el numero de camiones correctamente\n");
+            return(1);
+        }
         break;
     default:
-        
+        fprintf(stderr, "Error. No se han ejecutado el programa correctamente, prueba a ejecutarlo de la siguiente forma:\n parking PLAZAS (PLANTAS) (COCHES) (CAMIONES)\n");
         return(1);
         break;
     }
@@ -127,16 +152,12 @@ int main(int argc, char* argv[]){
     pthread_mutex_init(&mutex, NULL); 
     pthread_cond_init(&no_lleno, NULL);
     pthread_cond_init(&huecoCamion, NULL);
-    pthread_cond_init(&turnoCamion, NULL);
 
     // Inicializamos las listas de condiciones en funcion de los coches y camiones existentes
     esperandoCoche = (pthread_cond_t *) malloc(sizeof(pthread_cond_t)*coches);
     esperandoCamion = (pthread_cond_t *) malloc(sizeof(pthread_cond_t)*camiones);
 
     //creamos tantos threads como coches tenemos
-    fprintf(stderr,"coches %i\n",coches);
-    fprintf(stderr,"camion %i\n",camiones);
-
     for (i=0;i<coches;i++){
         nCoches[i] = (i+1);
         pthread_cond_init(&esperandoCoche[i], NULL);
@@ -171,7 +192,7 @@ void *coche(void* nCoche){
         //Añadimos un coche a la cola total
         insertarTotal(&esteCoche);
         vehiculosCola++;
-        primero = *primeroTotal();
+        primero = *primeroTotal();//Tomamos el primero de la cola
         if(vehiculosCola == 1){//Puede darse la casualidad de que el parking esté lleno y llegue justo un coche, nadie le avisa
             while (!plazasLibres){
                 pthread_cond_wait(&no_lleno, &mutex); //con esto va a esperar a que le avisen de que ya es el primero
@@ -183,35 +204,41 @@ void *coche(void* nCoche){
                 primero = *(TVehiculo *) primeroTotal();//En caso que se ejecute esta línea actualizo el primero, porque tengo el mutex
             }
         }
-        //Seccion crítica
-        //Lo quitamos de la cola porque volvemos a tener el control del mutex
-        extraerTotal();
-        vehiculosCola--;            
-        fprintf(stderr,"Soy el coche %i\n", numCoche);  
-        if(vehiculosCola){
-            primero = *(TVehiculo *) primeroTotal();        
-            fprintf(stderr,"Y el siguiente es %i\n", primero.numero);
-        }
+        //Seccion crítica        
+        extraerTotal();//Lo quitamos de la cola
+        vehiculosCola--;        
         plazasLibres--;
         aparcar(&plantaAux,&plazaAux, numCoche);//esta función busca un aparcamiento y devuelve la posición
+        fprintf(stderr,"ENTRADA: Coche %i aparca en %i, planta %i. Plazas Libres: %i\n", numCoche, plazaAux, plantaAux, plazasLibres);  
         muestraParking();
+        //Avisamos al siguiente por si acaso queda hueco en el parking
+        if(vehiculosCola){
+            primero = *(TVehiculo *) primeroTotal();
+            if(primero.esCamion){
+                pthread_cond_signal(&esperandoCamion[(primero.numero)-101]);
+            }
+            else{
+                pthread_cond_signal(&esperandoCoche[(primero.numero)-1]);
+            }
+        }
+
         pthread_mutex_unlock(&mutex);
-        //el vehiculo ha sido estacionado
+        //El vehiculo ha sido estacionado
         espera = (rand()% 40) +3;
         sleep(espera);
-        pthread_mutex_lock(&mutex);
-        fprintf(stderr,"Sale el coche %i\n", numCoche);
+        //Quiere salir y pide acceso al mutex
+        pthread_mutex_lock(&mutex);        
         plazasLibres++;
         desaparcar(plantaAux,plazaAux);
+        fprintf(stderr,"SALIDA: Coche %i saliendo. Plazas libres: %i\n", numCoche, plazasLibres);
         muestraParking();
-        fprintf(stderr,"Vehiculos %i\n\n", vehiculosCola);
-        //Comprobamos que haya hueco en una plaza adyacente, teniendo cuidado con las plazas de los extremos
-        
+
+        //Comprobamos que haya hueco en una plaza adyacente, teniendo cuidado con las plazas de los extremos        
         pthread_cond_signal(&no_lleno);
         if(vehiculosCola){
             primero = *(TVehiculo *) primeroTotal();
             if(primero.esCamion){
-                pthread_cond_signal(&esperandoCamion[(primero.numero)-1]);
+                pthread_cond_signal(&esperandoCamion[(primero.numero)-101]);
             }
             else{
                 pthread_cond_signal(&esperandoCoche[(primero.numero)-1]);
@@ -241,9 +268,11 @@ void aparcar(int *plantaAux, int *plazaAux, int numCoche){
     }
     *plazaAux=--j;
     *plantaAux=--i;
+    return;
 }
 void desaparcar(int planta,int plaza){
     parking[planta][plaza]=0;
+    return;
 }
 
 
@@ -289,55 +318,54 @@ void *camion(void *nCamion){
         insertarTotal(&esteCamion);
         vehiculosCola++;
         primero = *primeroTotal();
-        /*Aqui ya hemos cubierto el caso de que llegue un camión cuando el parking está lleno
-        puesto que no va a entrar en el primer while
-        luego se pasará a la cola de camiones y le daremos el turno al camión
-        */
-        //
-        //TT
-        if(vehiculosCola == 1){//Puede darse la casualidad de que el parking esté lleno y llegue justo un coche, nadie le avisa
+        if(vehiculosCola == 1){//Puede darse la casualidad de que el parking esté lleno y llegue justo un camión, nadie le avisa
             while (!buscaLibre(&plantaLibreAux, &plazaLibreAux) ){
                 pthread_cond_wait(&huecoCamion, &mutex); //con esto va a esperar a que le avisen de que ya es el primero
             }
         }  
         else{
-            while (!buscaLibre(&plantaLibreAux, &plazaLibreAux) || !(primero.numero == esteCamion.numero && !primero.esCamion)){//espera mientras no sea el primero
-                pthread_cond_wait(&esperandoCamion[numCamion-1], &mutex); //con esto va a esperar a que le avisen de que ya es el primero
+            while (!buscaLibre(&plantaLibreAux, &plazaLibreAux) || !(primero.numero == esteCamion.numero && primero.esCamion)){//espera mientras no sea el primero
+                pthread_cond_wait(&esperandoCamion[numCamion-101], &mutex); //con esto va a esperar a que le avisen de que ya es el primero
                 primero = *(TVehiculo *) primeroTotal();//En caso que se ejecute esta línea actualizo el primero, porque tengo el mutex
             }
-        }     
+        }
+        //Seccion crítica    
         extraerTotal();
         vehiculosCola--; 
-        contadorCoches = 0;
-        //Seccion crítica
-        fprintf(stderr,"Soy el camion %i\n", numCamion);  
-        if(vehiculosCola){
-            primero = *(TVehiculo *) primeroTotal();        
-            fprintf(stderr,"Y el siguiente es %i\n", primero.numero);
-        }  
         plazasLibres -= 2;
         aparcarCamion(plantaLibreAux,plazaLibreAux, numCamion);//la esta función busca un aparcamiento y devuelve la posición
+        fprintf(stderr,"ENTRADA: Camión %i aparca en %i y %i, planta %i. Plazas Libres: %i\n", numCamion, plazaLibreAux, plazaLibreAux+1, plantaLibreAux, plazasLibres);
         muestraParking();
-        pthread_mutex_unlock(&mutex);//Liberamos el mutex para que otros puedan acceder al parking
-        espera = (rand()% 60) +10;
-        sleep(espera);//Esperamos un tiempo aleatorio
-        pthread_mutex_lock(&mutex);//peleamos por el mutex para desaparcar
-        fprintf(stderr,"Sale el camion %i\n", numCamion);        
-        plazasLibres +=2;
-        desaparcarCamion(plantaLibreAux, plazaLibreAux);
-        pthread_cond_signal(&no_lleno);
-        pthread_cond_signal(&huecoCamion);
+        //Avisamos al siguiente por si acaso queda hueco en el parking
         if(vehiculosCola){
             primero = *(TVehiculo *) primeroTotal();
             if(primero.esCamion){
-                pthread_cond_signal(&esperandoCamion[(primero.numero)-1]);
+                pthread_cond_signal(&esperandoCamion[(primero.numero)-101]);
             }
             else{
                 pthread_cond_signal(&esperandoCoche[(primero.numero)-1]);
             }
         }
-        muestraParking();
-        fprintf(stderr,"Vehiculos %i\n\n", vehiculosCola);
+        pthread_mutex_unlock(&mutex);//Liberamos el mutex para que otros puedan acceder al parking
+        espera = (rand()% 60) +1;
+        sleep(espera);//Esperamos un tiempo aleatorio
+        //Peleamos por el mutex para desaparcar
+        pthread_mutex_lock(&mutex);       
+        plazasLibres +=2;
+        desaparcarCamion(plantaLibreAux, plazaLibreAux);
+        fprintf(stderr,"SALIDA: Camión %i saliendo. Plazas libres: %i\n", numCamion, plazasLibres);
+        //Damos las señales       
+        pthread_cond_signal(&no_lleno);
+        pthread_cond_signal(&huecoCamion);
+        if(vehiculosCola){
+            primero = *(TVehiculo *) primeroTotal();
+            if(primero.esCamion){
+                pthread_cond_signal(&esperandoCamion[(primero.numero)-101]);
+            }
+            else{
+                pthread_cond_signal(&esperandoCoche[(primero.numero)-1]);
+            }
+        }
         pthread_mutex_unlock(&mutex);
     }
 }
