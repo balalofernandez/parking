@@ -30,7 +30,6 @@ int vehiculosCola;//Los vehiculos que están en la cola total
 pthread_mutex_t mutex;
 
 //Tenemos la condición de que el parking está lleno
-pthread_cond_t no_lleno;
 pthread_cond_t huecoCamion;
 //Vamos a darle una condición de espera para autorizarle a pasar en el caso de que sea el primero de la cola
 pthread_cond_t *esperandoCoche;
@@ -150,7 +149,6 @@ int main(int argc, char* argv[]){
     nCoches = (int *) calloc(coches, sizeof(int));//Inicializamos la lista de coches
     //Iniciamos el mutex y las condiciones
     pthread_mutex_init(&mutex, NULL); 
-    pthread_cond_init(&no_lleno, NULL);
     pthread_cond_init(&huecoCamion, NULL);
 
     // Inicializamos las listas de condiciones en funcion de los coches y camiones existentes
@@ -226,8 +224,7 @@ void *coche(void* nCoche){
         fprintf(stderr,"SALIDA: Coche %i saliendo. Plazas libres: %i\n", numCoche, plazasLibres);
         muestraParking();
 
-        //Comprobamos que haya hueco en una plaza adyacente, teniendo cuidado con las plazas de los extremos        
-        pthread_cond_signal(&no_lleno);
+        //Comprobamos que haya hueco en una plaza adyacente, teniendo cuidado con las plazas de los extremos      
         if(vehiculosCola){
             primero = *(TVehiculo *) primeroTotal();
             if(primero.esCamion){
@@ -348,7 +345,6 @@ void *camion(void *nCamion){
         desaparcarCamion(plantaLibreAux, plazaLibreAux);
         fprintf(stderr,"SALIDA: Camión %i saliendo. Plazas libres: %i\n", numCamion, plazasLibres);
         //Damos las señales       
-        pthread_cond_signal(&no_lleno);
         pthread_cond_signal(&huecoCamion);
         if(vehiculosCola){
             primero = *(TVehiculo *) primeroTotal();
