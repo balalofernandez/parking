@@ -340,7 +340,7 @@ void *camion(void *nCamion){
         fprintf(stderr,"Vehiculos %i\n\n", vehiculosCola);
         pthread_mutex_unlock(&mutex);
     }
-};
+}
 
 void aparcarCamion(int plantaAux, int plazaAux, int numCamion){
     if(parking[plantaAux][plazaAux] || parking[plantaAux][plazaAux+1]){
@@ -391,37 +391,9 @@ void extraerTotal(){
     }
 }
 
-void insertarCamion(TVehiculo *vehiculo){
-    aux=(TCola *)malloc(sizeof(TCola));
-    aux->vehiculo = vehiculo;
-    aux->sig = NULL;
-    if (cabezaCamiones==NULL)
-        finCamiones=cabezaCamiones=aux;
-    else
-    {
-        finCamiones->sig = aux;
-        finCamiones = aux;
-    }
-}
-
-void extraerCamion(){
-    if(cabezaCamiones){
-        aux = cabezaCamiones;
-        cabezaCamiones = cabezaCamiones->sig;
-        free(aux);
-    }
-}
-
 TVehiculo *primeroTotal(){
     if(cabezaTotal){
         aux = cabezaTotal;
-        return aux->vehiculo;
-    }
-    else return NULL;
-}
-TVehiculo *primeroCamiones(){
-    if(cabezaCamiones){
-        aux = cabezaCamiones;
         return aux->vehiculo;
     }
     else return NULL;
